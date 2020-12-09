@@ -15,13 +15,14 @@ use think\Config;
 use think\Loader;
 use think\Cache;
 use think\Route;
+use think\Db;
 
 // 插件目录
 define('PLUGIN_PATH', ROOT_PATH . 'plugin' . DS);
 
 // 定义路由
 //Route::any('plugin/execute/:route', "\\think\\plugin\\Route@execute");
-Route::any('plugin/:addon/[:controller]/[:action]', "\\think\\plugin\\Route@execute");
+Route::any('plugin/:group/:addon/[:controller]/[:action]', "\\think\\plugin\\Route@execute");
 
 // 如果插件目录不存在则创建
 if (!is_dir(PLUGIN_PATH)) {
@@ -58,14 +59,14 @@ Hook::add('app_init', function () {
             $rules[$k] = sprintf($execute, $addon, $controller, $action);
         }
     }
-    
+    //自定义插件路径
     Route::rule($rules);
     if ($domains) {
         Route::domain($domains);
     }
     
-    // 获取系统配置
-    $hooks = App::$debug ? [] : Cache::get('hooks', []);
+    // 获取系统配置+插件安装时的hook机制
+    $hooks = App::$debug ? [] : Cache::get('plugin_hooks', []);
     if (empty($hooks)) {
         $hooks = (array)Config::get('plugin.hooks');
         // 初始化钩子
@@ -77,7 +78,12 @@ Hook::add('app_init', function () {
             }
             $hooks[$key] = array_filter(array_map('get_plugin_class', $values));
         }
-        Cache::set('hooks', $hooks);
+        //获取hook表
+        $list = Db::name("plugin_hook")->where('status',1)->field("name,hook_function")->select();
+        foreach ($list as $k=>$v){
+            $hooks[$v['hook_function']] = array_filter(array_map('get_plugin_class', [$v['name']]));
+        }
+        Cache::set('plugin_hooks', $hooks,3600*24);
     }
     //如果在插件中有定义app_init，则直接执行
     if (isset($hooks['app_init'])) {
@@ -88,27 +94,6 @@ Hook::add('app_init', function () {
     Hook::import($hooks, true);
 });
 
-// 闭包初始化行为
-Hook::add('action_begin', function () {
-    // 获取系统配置
-    $data = App::$debug ? [] : Cache::get('hooks', []);
-    $plugin = (array)Config::get('plugin.hooks');
-    if (empty($data)) {
-        // 初始化钩子
-        foreach ($plugin as $key => $values) {
-            if (is_string($values)) {
-                $values = explode(',', $values);
-            } else {
-                $values = (array)$values;
-            }
-            $plugin[$key] = array_filter(array_map('get_plugin_class', $values));
-            Hook::add($key, $plugin[$key]);
-        }
-        Cache::set('hooks', $plugin);
-    } else {
-        Hook::import($data, false);
-    }
-});
 
 /**
  * 处理插件钩子
@@ -128,7 +113,7 @@ function hooks($hook, $params = [])
  * @param string $class 当前类名
  * @return string
  */
-function get_plugin_class($name, $type = 'hook', $class = null)
+function get_plugin_class($name, $group='backend',$type = 'hook', $class = null)
 {
     $name = Loader::parseName($name);
     // 处理多级控制器情况
@@ -143,12 +128,11 @@ function get_plugin_class($name, $type = 'hook', $class = null)
     }
     switch ($type) {
         case 'controller':
-            $namespace = "\\plugin\\" . $name . "\\controller\\" . $class;
+            $namespace = "\\plugin\\" . $name ."\\".$group. "\\controller\\" . $class;
             break;
         default:
             $namespace = "\\plugin\\" . $name . "\\" . $class;
     }
-
     return class_exists($namespace) ? $namespace : '';
 }
 

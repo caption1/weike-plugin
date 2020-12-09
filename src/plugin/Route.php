@@ -14,18 +14,19 @@ use think\Hook;
 use think\Request;
 use think\exception\HttpException;
 use think\Loader;
-
+use think\Db;
+use think\Cache;
 /**
  * 插件执行默认控制器
  * Class AddonsController
  * @package think\addons
  */
-class Route extends Controller
+class Route 
 {
     /**
      * 插件执行
      */
-    public function execute($addon = null, $controller = null, $action = null)
+    public function execute($group=null,$addon = null, $controller = null, $action = null)
     {
         $request = Request::instance();
         // 是否自动转换控制器和操作名
@@ -36,28 +37,40 @@ class Route extends Controller
         $controller = $controller ? trim(call_user_func($filter, $controller)) : 'index';
         $action = $action ? trim(call_user_func($filter, $action)) : 'index';
         Hook::listen('plugin_begin', $request);
+        
         if (!empty($addon) && !empty($controller) && !empty($action)) {
             //查询插件信息
-            $info = [];
-//             if (!$info) {
-//                 throw new HttpException(404, __('addon %s not found', $addon));
-//             }
-//             if ($info['status']) {
-//                 throw new HttpException(500, __('addon %s is disabled', $addon));
-//             }
+            $info = Cache::remember('plugin_info'.$addon,function()use($addon){
+                return Db::name("plugin")->where('name',$addon)->find();
+            },3600);            
+            if (!$info) {
+                $this->error('插件不存在','2000');
+            }
+            if ($info['status']!=1) {
+                $this->error('插件已禁用','2001');
+            }
+            //检测该店铺是否有插件权限
+            $userPlugin =  Cache::remember('user_plugin_id'.$info['id'],function()use($info){
+                return Db::name("user_plugin")->where('store_id',$this->storeId)->where('plugin_id',$info['id'])->find();
+            },3600); 
+            if(empty($userPlugin)){
+                $this->error('插件未购买','2002');
+            }
+            if($userPlugin['expire_time'] > 0 && $userPlugin['expire_time'] < time()){
+                $this->error('插已过期','2003');
+            }
+            
             $dispatch = $request->dispatch();
             if (isset($dispatch['var']) && $dispatch['var']) {
                 //$request->route($dispatch['var']);
             }
-            
             // 设置当前请求的控制器、操作
             $request->controller($controller)->action($action);
-            
             // 兼容旧版本行为,即将移除,不建议使用
             Hook::listen('plugin_init', $request);
             
-            $class = get_plugin_class($addon, 'controller', $controller);
-            
+            $class = get_plugin_class($addon,$group, 'controller', $controller);
+           
             if (!$class) {
                 throw new HttpException(404, __('addon controller %s not found', Loader::parseName($controller, 1)));
             }
@@ -77,7 +90,7 @@ class Route extends Controller
                 throw new HttpException(404, __('addon action %s not found', get_class($instance) . '->' . $action . '()'));
             }
             Hook::listen('plugin_action_begin', $call);
-            
+            var_dump($call);exit();
             return call_user_func_array($call, $vars);
         } else {
             abort(500, lang('addon can not be empty'));

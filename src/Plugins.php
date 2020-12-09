@@ -206,10 +206,54 @@ abstract class Plugins
     {
         return $this->error;
     }
-
+    
     //必须实现安装
+    public function init($group='',$hookName=''){
+        if(!$group){
+            return false;
+        }
+        if(!$hookName){
+            return false;
+        }
+        $data['name'] = $this->getName();
+        $data['group'] = $group;
+        $data['hook_function'] = $hookName;
+        $data['create_time'] = time();
+        Db::name("plugin_hook")->insert($data);
+        Cache::rm('plugin_hooks');
+        return true;
+    }
+
+    /**
+     * 插件的统一安装
+     * @param unknown $group
+     * @param unknown $hookName
+     * @return boolean
+     */
     abstract public function install();
 
-    //必须卸载插件方法
-    abstract public function uninstall();
+    /**
+     * 插件的统一卸载
+     */
+    public function uninstall(){
+        Db::name("plugin_hook")->where('name',$this->getName())->delete();
+        Cache::rm('plugin_hooks');
+    }
+    
+    /**
+     * 禁用
+     */
+    public function disable(){
+        Db::name("plugin")->where('name',$this->getName())->update(['status'=>0]);
+        Cache::rm('plugin_hooks');
+    }
+    
+    /**
+     * 启用
+     */
+    public function enable(){
+        Db::name("plugin")->where('name',$this->getName())->update(['status'=>1]);
+        Cache::rm('plugin_hooks');
+    }
+    
 }
