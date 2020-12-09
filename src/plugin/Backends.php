@@ -13,14 +13,14 @@ namespace think\plugin;
 use think\Request;
 use think\Config;
 use think\Loader;
-use app\common\controller\Router;
+use app\common\controller\Api;
 
 /**
- * 插件前台接口基类控制器
+ * 插件后台基类控制器
  * Class Controller
  * @package think\addons
  */
-class Frontends extends Router
+class Backends extends Api
 {
     // 当前插件操作
     protected $plugin = null;

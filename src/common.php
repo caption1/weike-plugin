@@ -22,7 +22,7 @@ define('PLUGIN_PATH', ROOT_PATH . 'plugin' . DS);
 
 // 定义路由
 //Route::any('plugin/execute/:route', "\\think\\plugin\\Route@execute");
-Route::any('plugin/:group/:addon/[:controller]/[:action]', "\\think\\plugin\\Route@execute");
+Route::any('plugin/:addon/:group/[:controller]/[:action]', "\\think\\plugin\\Route@execute");
 
 // 如果插件目录不存在则创建
 if (!is_dir(PLUGIN_PATH)) {

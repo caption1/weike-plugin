@@ -13,14 +13,16 @@ namespace think\plugin;
 use think\Request;
 use think\Config;
 use think\Loader;
-use app\common\controller\Api;
+use app\common\controller\Router;
+use think\Controller;
+use think\View;
 
 /**
- * 插件后台基类控制器
+ * 插件前台接口基类控制器
  * Class Controller
  * @package think\addons
  */
-class Controller extends Api
+class Frontends extends Controller
 {
     // 当前插件操作
     protected $plugin = null;
@@ -81,14 +83,15 @@ class Controller extends Api
         $this->plugin = $addon ? call_user_func($filter, $addon) : '';
         $this->controller = $controller ? call_user_func($filter, $controller) : 'index';
         $this->action = $action ? call_user_func($filter, $action) : 'index';
-        $this->group = $group ? call_user_func($filter, $group) : 'backend';
+        $this->group = $group ? call_user_func($filter, $group) : 'frontend';
         // 生成view_path
         $view_path = $this->config['view_path'] ?: 'view';
-
+       
         // 重置配置
         Config::set('template.view_path', PLUGIN_PATH . $this->plugin.DS.$this->group . DS . $view_path . DS);
-
+        
         parent::__construct($request);
+        
     }
 
     /**
