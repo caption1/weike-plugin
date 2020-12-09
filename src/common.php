@@ -79,7 +79,7 @@ Hook::add('app_init', function () {
             $hooks[$key] = array_filter(array_map('get_plugin_class', $values));
         }
         //获取hook表
-        $list = Db::name("plugin_hook")->where('status',1)->field("name,hook_function")->select();
+        $list = Db::name("plugin_hook")->where('status',0)->field("name,hook_function")->select();
         foreach ($list as $k=>$v){
             $hooks[$v['hook_function']] = array_filter(array_map('get_plugin_class', [$v['name']]));
         }

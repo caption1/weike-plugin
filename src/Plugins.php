@@ -241,7 +241,7 @@ abstract class Plugins
     }
     
     /**
-     * 禁用
+     * 下架
      */
     public function disable(){
         Db::name("plugin")->where('name',$this->getName())->update(['status'=>0]);
@@ -249,7 +249,7 @@ abstract class Plugins
     }
     
     /**
-     * 启用
+     * 上架
      */
     public function enable(){
         Db::name("plugin")->where('name',$this->getName())->update(['status'=>1]);
