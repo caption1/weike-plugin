@@ -225,6 +225,28 @@ abstract class Plugins
     }
 
     /**
+     * 初始化event事件
+     * @param string $event_type
+     * @param string $controller
+     * @param string $method
+     * @return boolean
+     */
+    public function event($event_type='',$controller='',$method=''){
+        if(!$event_type){
+            return false;
+        }
+        
+        $data['name'] = $this->getName();
+        $data['event_type'] = $event_type;
+        $data['controller'] = $controller;
+        $data['method'] = $method;
+        $data['create_time'] = time();
+        Db::name("plugin_event")->insert($data);
+        Cache::rm('plugin_event'.$event_type);
+        return true;
+    }
+    
+    /**
      * 插件的统一安装
      * @param unknown $group
      * @param unknown $hookName
@@ -237,11 +259,12 @@ abstract class Plugins
      */
     public function uninstall(){
         Db::name("plugin_hook")->where('name',$this->getName())->delete();
+        Db::name("plugin_event")->where('name',$this->getName())->delete();
         Cache::rm('plugin_hooks');
     }
     
     /**
-     * 下架
+     * 禁用
      */
     public function disable(){
         Db::name("plugin")->where('name',$this->getName())->update(['status'=>0]);
@@ -249,7 +272,7 @@ abstract class Plugins
     }
     
     /**
-     * 上架
+     * 启用
      */
     public function enable(){
         Db::name("plugin")->where('name',$this->getName())->update(['status'=>1]);

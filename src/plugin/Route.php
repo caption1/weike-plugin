@@ -19,13 +19,87 @@ use think\Cache;
 use think\Response;
 use think\exception\HttpResponseException;
 use think\Controller;
+use think\Config;
 /**
  * 插件执行默认控制器
  * Class AddonsController
  * @package think\addons
  */
-class Route 
+class Route extends Controller
 {
+    protected $responseType = 'json';
+    
+//     // 当前插件操作
+//     protected $plugin = null;
+//     protected $controller = null;
+//     protected $action = null;
+//     // 当前template
+//     protected $template;
+//     // 模板配置信息
+//     protected $config = [
+//         'type' => 'Think',
+//         'view_path' => '',
+//         'view_suffix' => 'html',
+//         'strip_space' => true,
+//         'view_depr' => DS,
+//         'tpl_begin' => '{',
+//         'tpl_end' => '}',
+//         'taglib_begin' => '{',
+//         'taglib_end' => '}',
+//     ];
+    
+//     /**
+//      * 架构函数
+//      * @param Request $request Request对象
+//      * @access public
+//      */
+//     public function __construct(Request $request = null)
+//     {
+//         // 生成request对象
+//         $this->request = is_null($request) ? Request::instance() : $request;
+//         // 初始化配置信息
+//         $this->config = Config::get('template') ?: $this->config;
+        
+//         // 处理路由参数
+//         $param = $this->request->param();
+//         $dispatch = $this->request->dispatch();
+//         $var = isset($dispatch['var']) ? $dispatch['var'] : [];
+//         $var = array_merge($param, $var);
+//         if (isset($dispatch['method']) && substr($dispatch['method'][0], 0, 7) == "\\addons")
+//         {
+//             $arr = explode("\\", $dispatch['method'][0]);
+//             $addon = strtolower($arr[2]);
+//             $controller = strtolower(end($arr));
+//             $action = $dispatch['method'][1];
+//         }
+//         else
+//         {
+//             $addon = isset($var['addon']) ? $var['addon'] : '';
+//             $controller = isset($var['controller']) ? $var['controller'] : '';
+//             $action = isset($var['action']) ? $var['action'] : '';
+//         }
+        
+//         $group = isset($var['group']) ? $var['group'] : '';
+        
+//         // 是否自动转换控制器和操作名
+//         $convert = \think\Config::get('url_convert');
+//         $filter = $convert ? 'strtolower' : 'trim';
+        
+//         $this->plugin = $addon ? call_user_func($filter, $addon) : '';
+//         $this->controller = $controller ? call_user_func($filter, $controller) : 'index';
+//         $this->action = $action ? call_user_func($filter, $action) : 'index';
+//         $this->group = $group ? call_user_func($filter, $group) : 'frontend';
+//         // 生成view_path
+//         $view_path = $this->config['view_path'] ?: 'view';
+        
+//         // 重置配置
+//         Config::set('template.view_path', PLUGIN_PATH . $this->plugin.DS.$this->group . DS . $view_path . DS);
+        
+//         parent::__construct($request);
+        
+//     }
+    
+    
     /**
      * 插件执行
      */
@@ -39,33 +113,30 @@ class Route
         $addon = $addon ? trim(call_user_func($filter, $addon)) : '';
         $controller = $controller ? trim(call_user_func($filter, $controller)) : 'index';
         $action = $action ? trim(call_user_func($filter, $action)) : 'index';
-        Hook::listen('plugin_begin', $request);
-        
+
         if (!empty($addon) && !empty($controller) && !empty($action)) {
             //查询插件信息
-            $info = Cache::remember('plugin_info'.$addon,function()use($addon){
-                return Db::name("plugin")->where('name',$addon)->find();
-            },3600);                     
+            $info = \app\common\model\Plugin::getPluginInfo($addon);
             if (!$info) {
                 $this->error('插件不存在','2000');
             }
-            if ($info['status']!=1) {
+            if ($info['status']) {
                 $this->error('插件已禁用','2001');
             }
             $storeId = input("store_id");
-            
+            //Cache::rm('user_plugin_id'.$info['id'].$storeId);
             //检测该店铺是否有插件权限
-            $userPlugin =  Cache::remember('user_plugin_id'.$info['id'],function()use($info,$storeId){
-                return Db::name("user_plugin")->where('store_id',$storeId)->where('plugin_id',$info['id'])->find();
-            },3600); 
-                
+//             $userPlugin =  Cache::remember('user_plugin_id'.$info['id'].$storeId,function()use($info,$storeId){
+//                 return Db::name("user_plugin")->where('store_id',$storeId)->where('plugin_id',$info['id'])->find();
+//             },1800); 
+            $userPlugin = \app\common\model\UserPlugin::getStorePluginInfo($storeId, $info['id']);
             if(!$userPlugin || empty($userPlugin)){
                 $this->error('插件未购买','2002');
             }
             if($userPlugin['expire_time'] > 0 && $userPlugin['expire_time'] < time()){
                 $this->error('插已过期','2003');
             }
-            
+
             $dispatch = $request->dispatch();
             if (isset($dispatch['var']) && $dispatch['var']) {
                 //$request->route($dispatch['var']);
@@ -75,14 +146,14 @@ class Route
             // 兼容旧版本行为,即将移除,不建议使用
             Hook::listen('plugin_init', $request);
             
+
             $class = get_plugin_class($addon,$group, 'controller', $controller);
-            
             if (!$class) {
                 throw new HttpException(404, __('addon controller %s not found', Loader::parseName($controller, 1)));
             }
             
             $instance = new $class($request);
-            
+           
             $vars = [];
             if (is_callable([$instance, $action])) {
                 // 执行操作方法
@@ -147,9 +218,10 @@ class Route
             'time' => Request::instance()->server('REQUEST_TIME'),
             'data' => $data,
         ];
+        
         // 如果未设置类型则自动判断
         $type = $type ? $type : ($this->request->param(config('var_jsonp_handler')) ? 'jsonp' : $this->responseType);
-        
+       
         if (isset($header['statuscode'])) {
             $code = $header['statuscode'];
             unset($header['statuscode']);

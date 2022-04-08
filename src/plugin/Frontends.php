@@ -22,7 +22,7 @@ use think\View;
  * Class Controller
  * @package think\addons
  */
-class Frontends extends Controller
+class Frontends extends Router
 {
     // 当前插件操作
     protected $plugin = null;
